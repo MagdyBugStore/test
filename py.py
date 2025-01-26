@@ -36,6 +36,25 @@ def encrypt_file(file_path, key):
     # Return the IV and the encrypted data
     return iv + encrypted_data
 
+# Encrypt the filename (using a simple encryption like AES)
+def encrypt_filename(filename, key):
+    # Pad the filename to make its length a multiple of the AES block size (16 bytes)
+    padder = padding.PKCS7(128).padder()
+    padded_filename = padder.update(filename.encode()) + padder.finalize()
+
+    iv = os.urandom(16)  # Generate a random IV
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+    encryptor = cipher.encryptor()
+    
+    # Encrypt the padded filename
+    encrypted_filename = encryptor.update(padded_filename) + encryptor.finalize()
+
+    # Return the IV and the encrypted filename
+    return iv + encrypted_filename
+
+    # Return the IV and the encrypted filename
+    return iv + encrypted_filename
+
 # Decrypt the contents of a file
 def decrypt_file(file_path, key):
     with open(file_path, 'rb') as file:
@@ -63,6 +82,17 @@ def decrypt_file(file_path, key):
 
     return data
 
+# Decrypt the filename
+def decrypt_filename(encrypted_filename, key):
+    iv = encrypted_filename[:16]
+    encrypted_filename = encrypted_filename[16:]
+
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+    decryptor = cipher.decryptor()
+    decrypted_filename = decryptor.update(encrypted_filename) + decryptor.finalize()
+
+    return decrypted_filename.decode()
+
 # Encrypt all files in the given directory and its subdirectories
 def encrypt_directory(directory_path, password):
     # Generate a salt (used to derive the key)
@@ -73,11 +103,16 @@ def encrypt_directory(directory_path, password):
         for filename in files:
             file_path = os.path.join(root, filename)
             encrypted_data = encrypt_file(file_path, key)
+
+            # Encrypt the filename
+            encrypted_filename = encrypt_filename(filename, key)
+
             # Save the encrypted file (with .rcm extension)
-            encrypted_file_path = file_path + ".rcm"
+            encrypted_file_path = os.path.join(root, encrypted_filename.hex() + ".rcm")
             with open(encrypted_file_path, 'wb') as enc_file:
                 enc_file.write(salt + encrypted_data)  # Store salt along with encrypted data
             print(f"Encrypted: {file_path} -> {encrypted_file_path}")
+
             os.remove(file_path)  # Delete the original file after encryption
             print(f"Deleted original file: {file_path}")
 
@@ -87,12 +122,30 @@ def decrypt_directory(directory_path, password):
         for filename in files:
             file_path = os.path.join(root, filename)
             if file_path.endswith('.rcm'):
+                with open(file_path, 'rb') as file:
+                    data = file.read()
+
+                # Extract the salt (first 16 bytes) and the encrypted data (rest of the bytes)
+                salt = data[:16]
+                encrypted_data = data[16:]
+
+                # Derive the key from the password and salt
+                key = generate_key(password, salt)
+
+                # Decrypt the file contents
                 decrypted_data = decrypt_file(file_path, password)
+
+                # Decrypt the filename
+                encrypted_filename = filename.encode()
+                decrypted_filename = decrypt_filename(encrypted_filename, key)
+
                 # Save the decrypted file (removing the .rcm extension)
-                decrypted_file_path = file_path[:-4]  # Remove .rcm extension
+                decrypted_file_path = os.path.join(root, decrypted_filename)
                 with open(decrypted_file_path, 'wb') as dec_file:
                     dec_file.write(decrypted_data)
+
                 print(f"Decrypted: {file_path} -> {decrypted_file_path}")
+
                 os.remove(file_path)  # Delete the encrypted file after decryption
                 print(f"Deleted encrypted file: {file_path}")
 
