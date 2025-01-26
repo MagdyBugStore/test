@@ -97,11 +97,14 @@ def decrypt_directory(directory_path, password):
                 print(f"Deleted encrypted file: {file_path}")
 
 # Example usage:
-directory_path = 'D:\\pdf\\test\\en'  # Replace with your directory path
-password = 'your_password'  # Set a strong password
-
 # Get user input for encryption or decryption choice
 user_input = input("Enter 1 to encrypt or 2 to decrypt: ")
+
+# Get user input for the directory path
+directory_path = input("Enter the path to the directory: ")
+
+# Get user input for the password
+password = input("Enter your password: ")
 
 # Make sure the user input is numeric
 if user_input == '1':
